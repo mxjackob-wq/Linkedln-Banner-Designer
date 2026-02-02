@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Type, Image, Star, Grid } from 'lucide-react';
+import { Layout, Type, Image, Star, Grid, Layers } from 'lucide-react';
 
 const SidebarTab = ({ icon: Icon, label, isActive, onClick }) => (
     <button
@@ -30,6 +30,12 @@ const LeftSidebar = ({ activeTab, setActiveTab, children }) => {
                     onClick={() => setActiveTab('elements')}
                 />
                 <SidebarTab
+                    icon={Layers}
+                    label="Layers"
+                    isActive={activeTab === 'layers'}
+                    onClick={() => setActiveTab('layers')}
+                />
+                <SidebarTab
                     icon={Type}
                     label="Text"
                     isActive={activeTab === 'text'}
@@ -37,7 +43,7 @@ const LeftSidebar = ({ activeTab, setActiveTab, children }) => {
                 />
                 <SidebarTab
                     icon={Star}
-                    label="Brand"
+                    label="Kits"
                     isActive={activeTab === 'brand'}
                     onClick={() => setActiveTab('brand')}
                 />

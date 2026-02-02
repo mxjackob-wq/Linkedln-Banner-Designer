@@ -13,7 +13,7 @@ const TopToolbar = ({ fileName, onFileNameChange, onDownload, onBack }) => {
                     <div className="h-8 w-[1px] bg-slate-200"></div>
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-blue-600">File</span>
-                        <button className="text-sm font-medium text-slate-600 hover:bg-slate-100 px-2 py-1 rounded">Resize</button>
+
                         <span className="text-slate-300">|</span>
                         <span className="text-sm text-slate-500">Auto-saved</span>
                     </div>
@@ -39,19 +39,14 @@ const TopToolbar = ({ fileName, onFileNameChange, onDownload, onBack }) => {
             </div>
 
             <div className="flex items-center gap-3">
-                <div className="flex -space-x-2 mr-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs font-bold text-blue-600">JD</div>
-                    <div className="w-8 h-8 rounded-full bg-green-100 border-2 border-white flex items-center justify-center text-xs font-bold text-green-600">+2</div>
-                </div>
+
 
                 <button className="p-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium text-sm flex items-center gap-2">
                     <Share2 size={16} />
                     Share
                 </button>
 
-                <button className="p-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 font-medium text-sm flex items-center gap-2">
-                    Send to teacher
-                </button>
+
 
                 <button
                     onClick={onDownload}

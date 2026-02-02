@@ -27,20 +27,16 @@ const BannerCanvas = ({
     onUpdateFaceConfig,
     // New Props
     elements = [],
-    selectedElementIds = [], // Array of selected element IDs (multi-select)
-    onSelectElement, // (id, shiftKey) => void
-    onUpdateElement,
-    // Grid Props
-    showGrid = false,
-    snapToGrid = false
+    selectedElementId,
+    onSelectElement,
+    onUpdateElement
 }) => {
     const canvasRef = useRef(null);
-    const GRID_SIZE = 40; // Size of grid squares
 
     // Drag State
     const [draggingItem, setDraggingItem] = useState(null); // { type: 'badge' | 'face' | 'element', id: string | null }
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-    const [faceRect, setFaceRect] = useState(null); // { x, y, w, h }
+    // { x, y, w, h }
 
     // Constants
     const WIDTH = 1584;
@@ -70,11 +66,26 @@ const BannerCanvas = ({
         };
     }, [imageUrl]);
 
+    // Helper refs to avoid dependency loops if inside effect
+    const drawTemplateRef = useRef(null);
+    const drawTextRef = useRef(null);
+
+    // Update refs with current functions
+    useEffect(() => {
+        drawTemplateRef.current = drawTemplate;
+        drawTextRef.current = drawText;
+    }); // Always update
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
+
+        // ... (rest of drawing logic)
+
+        // Use refs or local functions inside
+
 
         // Clear canvas
         ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -96,9 +107,6 @@ const BannerCanvas = ({
                 drawFace();
                 drawBadges();
                 drawElements();
-
-                // Draw Grid LAST to ensure visibility over templates/backgrounds
-                if (showGrid) drawGrid();
             } else {
                 fillBackground();
                 drawTemplateData();
@@ -106,9 +114,6 @@ const BannerCanvas = ({
                 drawFace();
                 drawBadges();
                 drawElements();
-
-                // Draw Grid LAST to ensure visibility over templates/backgrounds
-                if (showGrid) drawGrid();
             }
         };
 
@@ -123,15 +128,14 @@ const BannerCanvas = ({
         };
 
         const drawTemplateData = () => {
-            if (profession?.id === 'blank') return;
             if (template && profession) {
-                drawTemplate(ctx, template, colors);
+                // Call the hoisted/ref function
+                drawTemplateRef.current(ctx, template, colors);
             }
         };
 
         const drawTextData = () => {
-            if (profession?.id === 'blank') return;
-            drawText(ctx, profession, customText, template);
+            drawTextRef.current(ctx, profession, customText, template);
         };
 
         const drawLogoAndText = () => {
@@ -231,151 +235,67 @@ const BannerCanvas = ({
         const drawElements = () => {
             elements.forEach(el => {
                 ctx.save();
+                ctx.translate(el.x, el.y);
+                ctx.rotate((el.rotation || 0) * Math.PI / 180);
+                ctx.scale(el.scale || 1, el.scale || 1);
+
+                if (el.selected || el.id === selectedElementId) {
+                    // Draw selection border
+                    ctx.strokeStyle = '#2563eb';
+                    ctx.lineWidth = 2;
+                    // Bounding box approximation need to be based on element type
+                }
 
                 if (el.type === 'text') {
-                    // Text: Rotate around CENTER
-                    const fontSize = el.fontSize || 24;
-                    ctx.font = `${el.fontWeight || 'normal'} ${fontSize}px "${el.fontFamily || 'Inter'}", sans-serif`;
-                    const metrics = ctx.measureText(el.text);
-                    const width = metrics.width;
-                    const height = fontSize; // Approx
-
-                    const cx = el.x + width / 2;
-                    const cy = el.y + height / 2;
-
-                    ctx.translate(cx, cy);
-                    ctx.rotate((el.rotation || 0) * Math.PI / 180);
-                    ctx.scale(el.scale || 1, el.scale || 1);
-
-                    // Selection border style
-                    if (el.selected || selectedElementIds.includes(el.id)) {
-                        ctx.strokeStyle = '#2563eb';
-                        ctx.lineWidth = 2;
-                    }
-
+                    ctx.font = `${el.fontWeight || 'normal'} ${el.fontSize || 24}px "${el.fontFamily || 'Inter'}", sans-serif`;
                     ctx.fillStyle = el.color || '#000000';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
                     ctx.fillText(el.text, 0, 0);
 
                     // Selection Box for Text
-                    if (selectedElementIds.includes(el.id)) {
+                    if (el.id === selectedElementId) {
                         const metrics = ctx.measureText(el.text);
                         ctx.strokeRect(-5, -5, metrics.width + 10, (el.fontSize || 24) + 10);
                     }
-                } else if ((el.type === 'polygon' || el.type === 'line') && el.points && el.points.length > 0) {
-                    // Polygon OR Line (Vertex-Based): Rotate around CENTROID
-                    // 1. Calculate Centroid
-                    let sumX = 0;
-                    let sumY = 0;
-                    el.points.forEach(p => {
-                        sumX += p.x;
-                        sumY += p.y;
-                    });
-                    const cx = sumX / el.points.length;
-                    const cy = sumY / el.points.length;
-
-                    // 2. Translate to Absolute Centroid
-                    ctx.translate(el.x + cx, el.y + cy);
-                    ctx.rotate((el.rotation || 0) * Math.PI / 180);
-                    ctx.scale(el.scale || 1, el.scale || 1);
-
-                    // Selection border style
-                    if (el.selected || selectedElementIds.includes(el.id)) {
+                } else if (el.type === 'rect') {
+                    ctx.fillStyle = el.fill || '#e2e8f0';
+                    ctx.fillRect(0, 0, el.width || 100, el.height || 100);
+                    if (el.id === selectedElementId) ctx.strokeRect(-2, -2, (el.width || 100) + 4, (el.height || 100) + 4);
+                } else if (el.type === 'circle') {
+                    ctx.fillStyle = el.fill || '#e2e8f0';
+                    ctx.beginPath();
+                    ctx.arc(50, 50, 50, 0, Math.PI * 2);
+                    ctx.fill();
+                    if (el.id === selectedElementId) {
                         ctx.strokeStyle = '#2563eb';
-                        ctx.lineWidth = 2;
-                    }
-
-                    // 3. Draw Points relative to Centroid
-                    if (el.type === 'polygon') {
-                        ctx.fillStyle = el.fill || '#e2e8f0';
-                        ctx.beginPath();
-                        ctx.moveTo(el.points[0].x - cx, el.points[0].y - cy);
-                        for (let i = 1; i < el.points.length; i++) {
-                            ctx.lineTo(el.points[i].x - cx, el.points[i].y - cy);
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                    } else {
-                        // Line
-                        ctx.beginPath();
-                        const pts = el.points.map(p => ({ x: p.x - cx, y: p.y - cy }));
-
-                        if (pts.length > 0) {
-                            ctx.moveTo(pts[0].x, pts[0].y);
-
-                            if (el.lineType === 'spline') {
-                                // Spline (Quadratic Clean Smoothing)
-                                for (let i = 0; i < pts.length - 1; i++) {
-                                    const p0 = pts[i];
-                                    const p1 = pts[i + 1];
-
-                                    if (i === 0) {
-                                        ctx.moveTo(p0.x, p0.y);
-                                    }
-
-                                    // Midpoint for quadratic control
-                                    const midX = (p0.x + p1.x) / 2;
-                                    const midY = (p0.y + p1.y) / 2;
-
-                                    // For a true spline through points, we need bezier. 
-                                    // Simple approach: Curve to midpoint. 
-                                    // Better approach for "smooth path" through points:
-                                    // Use p0 as start, p1 as end? No, that's straight.
-                                    // We need control points.
-
-                                    // Simplest Smooth Path:
-                                    // Draw curve from previous-mid to current-mid?
-                                    // Let's use a simple quadratic curve strategy for "smoothness".
-                                    // Actually, let's just use the standard "draw curve through points" approach.
-                                    if (i < pts.length - 1) {
-                                        var cpX = (p0.x + p1.x) / 2;
-                                        var cpY = (p0.y + p1.y) / 2;
-                                        if (i === 0) ctx.lineTo(cpX, cpY);
-                                        else ctx.quadraticCurveTo(p0.x, p0.y, cpX, cpY);
-                                    }
-                                }
-                                // Connect last segment
-                                if (pts.length > 1) {
-                                    const last = pts[pts.length - 1];
-                                    const prev = pts[pts.length - 2];
-                                    // Just line to last for now to ensure connection
-                                    ctx.lineTo(last.x, last.y);
-                                }
-
-                            } else if (el.lineType === 'ortho') {
-                                // Ortho (Step Connector)
-                                for (let i = 0; i < pts.length - 1; i++) {
-                                    const p0 = pts[i];
-                                    const p1 = pts[i + 1];
-
-                                    // Mid X break
-                                    const midX = (p0.x + p1.x) / 2;
-
-                                    ctx.lineTo(midX, p0.y);
-                                    ctx.lineTo(midX, p1.y);
-                                    ctx.lineTo(p1.x, p1.y);
-                                }
-                            } else {
-                                // Straight
-                                for (let i = 1; i < pts.length; i++) {
-                                    ctx.lineTo(pts[i].x, pts[i].y);
-                                }
-                            }
-                        }
-
-                        ctx.strokeStyle = el.stroke || '#000';
-                        ctx.lineWidth = el.strokeWidth || 4;
                         ctx.stroke();
                     }
+                } else if (el.type === 'line') {
+                    ctx.strokeStyle = el.stroke || '#000';
+                    ctx.lineWidth = el.strokeWidth || 4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(el.width || 100, 0);
+                    ctx.stroke();
+                    if (el.id === selectedElementId) ctx.strokeRect(-5, -5, (el.width || 100) + 10, 10);
+                } else if (el.type === 'polygon' && el.points && el.points.length > 0) {
+                    ctx.fillStyle = el.fill || '#e2e8f0';
+                    ctx.beginPath();
+                    ctx.moveTo(el.points[0].x, el.points[0].y);
+                    for (let i = 1; i < el.points.length; i++) {
+                        ctx.lineTo(el.points[i].x, el.points[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
 
-                    if (el.stroke && el.type === 'polygon') {
+                    if (el.stroke) {
                         ctx.strokeStyle = el.stroke;
                         ctx.lineWidth = el.strokeWidth || 2;
                         ctx.stroke();
                     }
 
-                    if (el.selected || selectedElementIds.includes(el.id)) {
+                    if (el.selected || el.id === selectedElementId) {
                         ctx.strokeStyle = '#2563eb';
                         ctx.lineWidth = 1;
                         ctx.stroke();
@@ -384,81 +304,9 @@ const BannerCanvas = ({
                         ctx.fillStyle = '#2563eb';
                         el.points.forEach(p => {
                             ctx.beginPath();
-                            // Handle coords relative to centroid
-                            ctx.arc(p.x - cx, p.y - cy, 6, 0, Math.PI * 2);
+                            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
                             ctx.fill();
                         });
-                    }
-                } else {
-                    // Rect, Circle, Line: Rotate around CENTER (Unified)
-                    let cx = 0;
-                    let cy = 0;
-                    const w = el.width || 100;
-                    const h = el.height || 100;
-
-                    if (el.type === 'rect') {
-                        cx = w / 2;
-                        cy = h / 2;
-                    } else if (el.type === 'circle') {
-                        const radius = el.width ? el.width / 2 : 50;
-                        cx = radius;
-                        cy = radius;
-                    } else if (el.type === 'line') {
-                        cx = w / 2;
-                        cy = 0;
-                    }
-
-                    // Translate to Absolute Center
-                    ctx.translate(el.x + cx, el.y + cy);
-                    ctx.rotate((el.rotation || 0) * Math.PI / 180);
-                    ctx.scale(el.scale || 1, el.scale || 1);
-
-                    if (el.selected || selectedElementIds.includes(el.id)) {
-                        ctx.strokeStyle = '#2563eb';
-                        ctx.lineWidth = 2;
-                    }
-
-                    if (el.type === 'rect') {
-                        ctx.fillStyle = el.fill || '#e2e8f0';
-                        // Draw centered
-                        ctx.fillRect(-cx, -cy, w, h);
-
-                        if (el.stroke) {
-                            ctx.strokeStyle = el.stroke;
-                            ctx.lineWidth = el.strokeWidth || 2;
-                            ctx.strokeRect(-cx, -cy, w, h);
-                        }
-
-                        if (selectedElementIds.includes(el.id)) ctx.strokeRect(-cx - 2, -cy - 2, w + 4, h + 4);
-                    } else if (el.type === 'circle') {
-                        const radius = el.width ? el.width / 2 : 50;
-                        ctx.fillStyle = el.fill || '#e2e8f0';
-                        ctx.beginPath();
-                        // Draw centered at 0,0
-                        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-                        ctx.fill();
-
-                        if (el.stroke) {
-                            ctx.strokeStyle = el.stroke;
-                            ctx.lineWidth = el.strokeWidth || 2;
-                            ctx.stroke();
-                        }
-
-                        if (selectedElementIds.includes(el.id)) {
-                            ctx.strokeStyle = '#2563eb';
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                        }
-                    } else if (el.type === 'line') {
-                        ctx.strokeStyle = el.stroke || '#000';
-                        ctx.lineWidth = el.strokeWidth || 4;
-                        ctx.beginPath();
-                        // Draw centered line
-                        ctx.moveTo(-cx, 0);
-                        ctx.lineTo(cx, 0);
-                        ctx.stroke();
-
-                        if (selectedElementIds.includes(el.id)) ctx.strokeRect(-cx - 5, -5, w + 10, 10);
                     }
                 }
 
@@ -466,29 +314,9 @@ const BannerCanvas = ({
             });
         };
 
-        const drawGrid = () => {
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'; // Increased visibility
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-
-            // Vertical lines
-            for (let x = 0; x <= WIDTH; x += GRID_SIZE) {
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, HEIGHT);
-            }
-
-            // Horizontal lines
-            for (let y = 0; y <= HEIGHT; y += GRID_SIZE) {
-                ctx.moveTo(0, y);
-                ctx.lineTo(WIDTH, y);
-            }
-
-            ctx.stroke();
-        };
-
         drawContent();
 
-    }, [profession, template, customText, loadedImage, overlayOpacity, customPalette, customLogo, badges, faceConfig, elements, selectedElementIds, showGrid]); // Added showGrid dependency
+    }, [profession, template, customText, loadedImage, overlayOpacity, customPalette, customLogo, badges, faceConfig, elements, selectedElementId, colors]);
 
     // Use ref for rect to avoid re-render loops
     const faceRectRef = useRef(null);
@@ -524,8 +352,8 @@ const BannerCanvas = ({
                 if (pos.x >= el.x && pos.x <= el.x + 100 && pos.y >= el.y && pos.y <= el.y + 100) hit = true;
             }
 
-            // Polygon & Vertex-Line Hit Test (Vertex & Body)
-            if ((el.type === 'polygon' || el.type === 'line') && el.points && (el.selected || selectedElementIds.includes(el.id))) {
+            // Polygon Hit Test (Vertex & Body)
+            if (el.type === 'polygon' && (el.selected || el.id === selectedElementId)) {
                 // 1. Check Vertex Click
                 for (let j = 0; j < el.points.length; j++) {
                     const p = el.points[j];
@@ -533,23 +361,25 @@ const BannerCanvas = ({
                     if (dist < 10) { // Hit radius for vertex
                         setDraggingItem({ type: 'vertex', id: el.id, pointIndex: j });
                         setDragOffset({ x: 0, y: 0 }); // offset not needed for vertex direct set
-                        if (onSelectElement) onSelectElement(el.id, e.shiftKey);
+                        if (onSelectElement) onSelectElement(el.id);
                         clickedAny = true;
                         return;
                     }
                 }
             }
 
-            if (el.type === 'polygon' || (el.type === 'line' && el.points)) {
-                // Ray casting for polygon body hit test or Line distance check
-                // Simplified: Bounding box for now
+            if (el.type === 'polygon') {
+                // Ray casting for polygon body hit test
+                // const polyPoints = el.points.map(p => ({ x: el.x + p.x, y: el.y + p.y }));
+                // Simplified: Bounding box for now, actual raycast is expensive in loop if many points
+                // Better: Check bounding box first
                 const minX = Math.min(...el.points.map(p => p.x)) + el.x;
                 const maxX = Math.max(...el.points.map(p => p.x)) + el.x;
                 const minY = Math.min(...el.points.map(p => p.y)) + el.y;
                 const maxY = Math.max(...el.points.map(p => p.y)) + el.y;
 
-                if (pos.x >= minX - 10 && pos.x <= maxX + 10 && pos.y >= minY - 10 && pos.y <= maxY + 10) {
-                    // Expanded bounds for lines
+                if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) {
+                    // Refined check: ray casting could go here if needed
                     hit = true;
                 } else {
                     hit = false;
@@ -559,7 +389,7 @@ const BannerCanvas = ({
             if (hit) {
                 setDraggingItem({ type: 'element', id: el.id });
                 setDragOffset({ x: pos.x - el.x, y: pos.y - el.y });
-                if (onSelectElement) onSelectElement(el.id, e.shiftKey);
+                if (onSelectElement) onSelectElement(el.id);
                 clickedAny = true;
                 return;
             }
@@ -627,21 +457,12 @@ const BannerCanvas = ({
 
         if (!draggingItem) return;
 
-        // Snapping Logic
-        let targetX = pos.x - dragOffset.x;
-        let targetY = pos.y - dragOffset.y;
-
-        if (snapToGrid) {
-            targetX = Math.round(targetX / GRID_SIZE) * GRID_SIZE;
-            targetY = Math.round(targetY / GRID_SIZE) * GRID_SIZE;
-        }
-
         if (draggingItem.type === 'badge' && onUpdateBadgePosition) {
-            onUpdateBadgePosition(draggingItem.id, targetX, targetY);
+            onUpdateBadgePosition(draggingItem.id, pos.x - dragOffset.x, pos.y - dragOffset.y);
         } else if (draggingItem.type === 'face' && onUpdateFaceConfig) {
-            onUpdateFaceConfig({ ...faceConfig, x: targetX, y: targetY });
+            onUpdateFaceConfig({ ...faceConfig, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y });
         } else if (draggingItem.type === 'element' && onUpdateElement) {
-            onUpdateElement(draggingItem.id, { x: targetX, y: targetY });
+            onUpdateElement(draggingItem.id, { x: pos.x - dragOffset.x, y: pos.y - dragOffset.y });
         } else if (draggingItem.type === 'vertex' && onUpdateElement) {
             // Find element
             const el = elements.find(e => e.id === draggingItem.id);
@@ -652,24 +473,9 @@ const BannerCanvas = ({
                 const newPoints = [...el.points];
                 const pIndex = draggingItem.pointIndex;
                 // Calculate local relative to shape origin
-                const rawX = pos.x;
-                const rawY = pos.y;
-
-                let finalX = rawX;
-                let finalY = rawY;
-
-                if (snapToGrid) {
-                    finalX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                    finalY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-                }
-
-                // Clamp to canvas
-                const clampedX = Math.max(0, Math.min(finalX, WIDTH));
-                const clampedY = Math.max(0, Math.min(finalY, HEIGHT));
-
                 newPoints[pIndex] = {
-                    x: clampedX - el.x, // Vertex is relative to shape origin (el.x, el.y)
-                    y: clampedY - el.y
+                    x: pos.x - el.x,
+                    y: pos.y - el.y
                 };
                 onUpdateElement(draggingItem.id, { points: newPoints });
             }
@@ -680,28 +486,9 @@ const BannerCanvas = ({
         setDraggingItem(null);
     };
 
-    // Global Drag Event Listeners
-    useEffect(() => {
-        if (draggingItem) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        } else {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        }
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [draggingItem, faceConfig, elements, badges, dragOffset]);
-
-    // Helper functions (pure or with args)
+    // Helper functions (Moved up for scope access)
     const drawTemplate = (ctx, template, palette) => {
         // Based on src/data/templates.js
-        /* 
-           styles: 'modern', 'clean', 'minimal', 'grid', 'bold'
-        */
         if (template.style === 'modern') {
             ctx.fillStyle = palette[0];
             ctx.globalAlpha = 0.9;
@@ -716,27 +503,22 @@ const BannerCanvas = ({
             ctx.fillStyle = palette[0];
             ctx.fillRect(0, HEIGHT * 0.75, WIDTH, HEIGHT * 0.25);
         } else if (template.style === 'clean') {
-            // Personal Brand: Soft side gradient
             const gradient = ctx.createLinearGradient(0, 0, WIDTH * 0.5, 0);
-            gradient.addColorStop(0, palette[0]); // Primary
+            gradient.addColorStop(0, palette[0]);
             gradient.addColorStop(1, "transparent");
             ctx.fillStyle = gradient;
             ctx.globalAlpha = 0.8;
             ctx.fillRect(0, 0, WIDTH, HEIGHT);
             ctx.globalAlpha = 1.0;
         } else if (template.style === 'minimal') {
-            // Minimalist: Clean, just a subtle accent
             ctx.fillStyle = palette[0];
-            ctx.fillRect(WIDTH - 20, 0, 20, HEIGHT); // Right border
+            ctx.fillRect(WIDTH - 20, 0, 20, HEIGHT);
         } else if (template.style === 'grid') {
-            // Grid: Panels simulation
             ctx.fillStyle = palette[1];
             ctx.globalAlpha = 0.2;
             ctx.fillRect(WIDTH / 3, 0, 2, HEIGHT);
             ctx.fillRect(2 * WIDTH / 3, 0, 2, HEIGHT);
             ctx.globalAlpha = 1.0;
-
-            // Bottom bar
             ctx.fillStyle = palette[0];
             ctx.globalAlpha = 0.9;
             ctx.fillRect(0, HEIGHT - 80, WIDTH, 80);
@@ -746,7 +528,6 @@ const BannerCanvas = ({
 
     const drawText = (ctx, profession, customText, template) => {
         const layout = template?.layout || { textPosition: 'left' };
-
         let x = 50;
         let align = 'left';
         let yoffset = 0;
@@ -754,7 +535,6 @@ const BannerCanvas = ({
         if (layout.textPosition === 'center' || layout.textPosition === 'center-big') {
             x = WIDTH / 2;
             align = 'center';
-            // If centered, maybe move up a bit if clean style
             if (template.style === 'clean') yoffset = -20;
         } else if (layout.textPosition === 'right') {
             x = WIDTH - 50;
@@ -762,18 +542,14 @@ const BannerCanvas = ({
         } else if (layout.textPosition === 'overlay-bottom') {
             x = WIDTH / 2;
             align = 'center';
-            yoffset = HEIGHT / 2 - 40; // Push down
+            yoffset = HEIGHT / 2 - 40;
         }
 
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
-
-        // Title
         ctx.fillStyle = customText?.color || '#ffffff';
-        // Bold style has bigger font
         const fontSize = template.style === 'bold' ? 100 : 64;
         ctx.font = `bold ${fontSize}px "${customText?.font || 'Inter'}", sans-serif`;
-
         ctx.shadowColor = "rgba(0,0,0,0.5)";
         ctx.shadowBlur = 4;
 
@@ -781,14 +557,11 @@ const BannerCanvas = ({
         ctx.fillText(titleText, x, 140 + yoffset);
 
         ctx.shadowBlur = 0;
-
-        // Tagline
         ctx.fillStyle = '#f0f0f0';
         ctx.font = `32px "${customText?.font || 'Inter'}", sans-serif`;
         const taglineText = customText?.tagline || profession?.defaultTagline || 'Your Tagline Here';
         ctx.fillText(taglineText, x, 210 + yoffset);
 
-        // Simple CTA/Details if not clean/minimal
         if (template.style !== 'minimal') {
             ctx.font = `20px "${customText?.font || 'Inter'}", sans-serif`;
             ctx.fillStyle = '#cbd5e1';
@@ -804,8 +577,11 @@ const BannerCanvas = ({
                 id="banner-canvas"
                 width={WIDTH}
                 height={HEIGHT}
-                className="w-full h-auto block"
+                className="w-full h-auto block cursor-crosshair"
                 onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
             />
         </div>
     );

@@ -1,6 +1,47 @@
-import { Trash2, Move, RotateCw, Type, Palette, Layout } from 'lucide-react';
+import { Trash2, Move, RotateCw, Type, Palette, Layout, Group, Ungroup } from 'lucide-react';
 
-const RightPanel = ({ selectedElement, onUpdateElement, onDeleteElement }) => {
+const RightPanel = ({
+    selectedElement,
+    selectedCount = 0,
+    onUpdateElement,
+    onDeleteElement,
+    onBringToFront,
+    onSendToBack,
+    onMoveForward,
+    onMoveBackward,
+    onGroupElements,
+    onUngroupElements
+}) => {
+    // Show multi-selection panel when more than 1 element is selected
+    if (selectedCount > 1) {
+        return (
+            <div className="w-72 bg-white border-l border-slate-200 h-full p-8 flex flex-col gap-4 items-center justify-center text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-2">
+                    <Layout size={32} />
+                </div>
+                <h3 className="font-bold text-slate-800">{selectedCount} Elements Selected</h3>
+                <p className="text-sm text-slate-500">Use Shift+click to toggle selection. Group elements or delete all selected.</p>
+
+                <div className="flex flex-col gap-2 w-full mt-4">
+                    <button
+                        onClick={onGroupElements}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                    >
+                        <Group size={18} />
+                        Group Selected
+                    </button>
+                    <button
+                        onClick={onDeleteElement}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 border border-red-200 rounded-lg font-medium hover:bg-red-100 transition-colors"
+                    >
+                        <Trash2 size={18} />
+                        Delete All Selected
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (!selectedElement) {
         return (
             <div className="w-72 bg-white border-l border-slate-200 h-full p-8 flex flex-col gap-4 items-center justify-center text-center">
@@ -9,9 +50,14 @@ const RightPanel = ({ selectedElement, onUpdateElement, onDeleteElement }) => {
                 </div>
                 <h3 className="font-bold text-slate-800">No Selection</h3>
                 <p className="text-sm text-slate-500">Select an element on the canvas to customize its properties.</p>
+                <p className="text-xs text-slate-400 mt-2">💡 Tip: Hold Shift and click to select multiple elements</p>
             </div>
         );
     }
+
+    // Check if selected element is a group
+    const isGroup = selectedElement.type === 'group';
+
 
     return (
         <div className="w-72 bg-white border-l border-slate-200 h-full flex flex-col overflow-y-auto">
@@ -26,6 +72,26 @@ const RightPanel = ({ selectedElement, onUpdateElement, onDeleteElement }) => {
             </div>
 
             <div className="p-5 space-y-6">
+
+                {/* Specific - Group */}
+                {isGroup && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-purple-600 font-medium text-sm">
+                            <Group size={16} />
+                            <span>Group ({selectedElement.childElements?.length || 0} items)</span>
+                        </div>
+                        <button
+                            onClick={onUngroupElements}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg font-medium hover:bg-orange-100 transition-colors"
+                        >
+                            <Ungroup size={16} />
+                            Ungroup Elements
+                        </button>
+                        <p className="text-xs text-slate-400">
+                            Ungrouping will restore the original elements at their current positions.
+                        </p>
+                    </div>
+                )}
 
                 {/* Specific - Text */}
                 {selectedElement.type === 'text' && (
@@ -84,12 +150,14 @@ const RightPanel = ({ selectedElement, onUpdateElement, onDeleteElement }) => {
                 )}
 
                 {/* Specific - Shape */}
-                {(selectedElement.type === 'rect' || selectedElement.type === 'circle') && (
+                {(selectedElement.type === 'rect' || selectedElement.type === 'circle' || selectedElement.type === 'polygon') && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-indigo-600 font-medium text-sm">
                             <Palette size={16} />
                             <span>Style</span>
                         </div>
+
+                        {/* Fill */}
                         <div>
                             <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Fill Color</label>
                             <div className="flex items-center gap-2">
@@ -101,26 +169,56 @@ const RightPanel = ({ selectedElement, onUpdateElement, onDeleteElement }) => {
                                 />
                             </div>
                         </div>
+
+                        {/* Stroke */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Width</label>
-                                <input
-                                    type="number"
-                                    value={selectedElement.width || 100}
-                                    onChange={(e) => onUpdateElement({ width: Number(e.target.value) })}
-                                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                                />
+                                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Border Color</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={selectedElement.stroke || '#000000'} // Default to black if undefined, but maybe transparent?
+                                        onChange={(e) => onUpdateElement({ stroke: e.target.value })}
+                                        className="w-full h-8 cursor-pointer rounded-lg border border-slate-200"
+                                    />
+                                    {/* Optional: Add a clear button for no stroke? For now, we'll stick to color picker */}
+                                </div>
                             </div>
                             <div>
-                                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Height</label>
+                                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Border Width</label>
                                 <input
                                     type="number"
-                                    value={selectedElement.height || 100}
-                                    onChange={(e) => onUpdateElement({ height: Number(e.target.value) })}
+                                    min="0"
+                                    value={selectedElement.strokeWidth || 0}
+                                    onChange={(e) => onUpdateElement({ strokeWidth: Number(e.target.value) })}
                                     className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                                 />
                             </div>
                         </div>
+
+                        {/* Dimensions (Rect/Circle only) - Polygon relies on points */}
+                        {selectedElement.type !== 'polygon' && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Width</label>
+                                    <input
+                                        type="number"
+                                        value={selectedElement.width || 100}
+                                        onChange={(e) => onUpdateElement({ width: Number(e.target.value) })}
+                                        className="w-full p-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Height</label>
+                                    <input
+                                        type="number"
+                                        value={selectedElement.height || 100}
+                                        onChange={(e) => onUpdateElement({ height: Number(e.target.value) })}
+                                        className="w-full p-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

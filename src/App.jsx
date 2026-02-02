@@ -6,10 +6,10 @@ import BackgroundEditor from './components/BackgroundEditor';
 import LandingPage from './components/LandingPage';
 import DesignCritique from './components/DesignCritique';
 import ColorPaletteGen from './components/ColorPaletteGen';
-import BrandKitManager from './components/BrandKitManager';
+
 import ProfileAnalyzer from './components/ProfileAnalyzer'; // New Import
 import IndustryTips from './components/IndustryTips'; // New Import
-import BadgeSelector from './components/BadgeSelector'; // New Import
+
 import OnboardingTour from './components/OnboardingTour'; // New Import
 import InspirationGallery from './components/InspirationGallery';
 import ExportPanel from './components/ExportPanel'; // New Import
@@ -23,6 +23,7 @@ import { searchImages } from './utils/imageService';
 import { downloadBannerAsJPEG, downloadBannerAsPDF } from './utils/exportService';
 import { saveToHistory, getHistory } from './utils/historyService';
 import { analyzeDesignWithGemini } from './utils/geminiService';
+import DevNote from './components/DevNote'; // New Import
 import { History, ArrowLeft, Sparkles, User, LogOut } from 'lucide-react';
 
 function App() {
@@ -100,6 +101,25 @@ function App() {
     setCustomLogo(null);
     setBadges([]);
     setFaceConfig({ image: null, x: 1000, y: 100, scale: 1, flip: 1 });
+
+    // Handle "Blank Design" separately to avoid unnecessary API calls
+    if (profession.id === 'blank') {
+      setTaglines([]);
+      setImages([]);
+      setBgImage(null);
+
+      const initialTextConfig = {
+        title: '',
+        tagline: '',
+        font: 'Inter',
+        color: '#1a1a1a'
+      };
+      setTextConfig(initialTextConfig);
+      setOverlayOpacity(0); // No overlay needed for blank white bg usually
+
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const generatedTaglines = await generateTaglines(profession.label, profession.keywords);
@@ -194,10 +214,25 @@ function App() {
     setCustomPalette(colors);
   };
 
-  const handleApplyBrandKit = (kit) => {
-    if (kit.colors && kit.colors.length > 0) setCustomPalette(kit.colors);
-    if (kit.logo) setCustomLogo(kit.logo);
-    if (kit.font) setTextConfig(prev => ({ ...prev, font: kit.font }));
+  const handleApplyKit = (kit) => {
+    // Brand Kit Logic
+    if (kit.type === 'brand') {
+      if (kit.colors && kit.colors.length > 0) setCustomPalette(kit.colors);
+      if (kit.logo) setCustomLogo(kit.logo);
+      if (kit.font) setTextConfig(prev => ({ ...prev, font: kit.font }));
+    }
+
+    // Person Kit Logic
+    if (kit.type === 'person') {
+      setTextConfig(prev => ({
+        ...prev,
+        title: kit.name || prev.title,
+        tagline: kit.title || prev.tagline
+      }));
+      if (kit.headshot) {
+        setFaceConfig(prev => ({ ...prev, image: kit.headshot }));
+      }
+    }
   };
 
   const handleAddBadge = (type) => {
@@ -224,6 +259,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+      <DevNote />
 
       {/* Onboarding Tour - Only show if in generator mode and not seen before */}
       {/* {view !== 'landing' && <OnboardingTour />} */}
@@ -240,7 +276,7 @@ function App() {
         onClose={() => setShowCritique(false)}
       />
 
-      {view !== 'landing' && (
+      {view !== 'landing' && !selectedProfession && (
         <header className="bg-white border-b border-slate-200 py-4 px-6 mb-8 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -307,32 +343,34 @@ function App() {
       {view === 'landing' ? (
         <LandingPage onStart={handleStart} />
       ) : (
-        <main className="p-4 max-w-[1600px] mx-auto">
+        <>
           {!selectedProfession ? (
-            <div className="flex flex-col gap-8 max-w-4xl mx-auto">
-              {showHistory && (
-                <div className="mb-8 animate-in slide-in-from-top-4 duration-300">
-                  <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
-                    <h3 className="text-lg font-bold text-slate-800 mb-4">Recent Designs</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {historyItems.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => loadHistoryItem(item)}
-                          className="text-left p-4 border border-slate-100 rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
-                        >
-                          <div className="font-semibold text-slate-800 group-hover:text-blue-600">{item.profession.label}</div>
-                          <div className="text-xs text-slate-500 truncate">{item.textConfig.title}</div>
-                          <div className="text-xs text-slate-400 mt-2">{new Date(item.date).toLocaleDateString()}</div>
-                        </button>
-                      ))}
+            <main className="p-4 max-w-[1600px] mx-auto">
+              <div className="flex flex-col gap-8 max-w-4xl mx-auto">
+                {showHistory && (
+                  <div className="mb-8 animate-in slide-in-from-top-4 duration-300">
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
+                      <h3 className="text-lg font-bold text-slate-800 mb-4">Recent Designs</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {historyItems.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => loadHistoryItem(item)}
+                            className="text-left p-4 border border-slate-100 rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
+                          >
+                            <div className="font-semibold text-slate-800 group-hover:text-blue-600">{item.profession.label}</div>
+                            <div className="text-xs text-slate-500 truncate">{item.textConfig.title}</div>
+                            <div className="text-xs text-slate-400 mt-2">{new Date(item.date).toLocaleDateString()}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <ProfileAnalyzer onAnalysisComplete={handleProfileAnalysis} />
-              <ProfessionSelector onSelect={handleProfessionSelect} />
-            </div>
+                )}
+                <ProfileAnalyzer onAnalysisComplete={handleProfileAnalysis} />
+                <ProfessionSelector onSelect={handleProfessionSelect} />
+              </div>
+            </main>
           ) : (
             <EditorLayout
               selectedProfession={selectedProfession}
@@ -356,9 +394,10 @@ function App() {
               onDownload={() => handleDownload('jpg')}
               handleCritique={handleCritique}
               taglines={taglines}
+              onApplyKit={handleApplyKit}
             />
           )}
-        </main>
+        </>
       )}
     </div>
   );

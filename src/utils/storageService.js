@@ -1,23 +1,52 @@
-const BRAND_KIT_KEY = 'linkedin_banner_brand_kit';
+const KITS_KEY = 'linkedin_banner_kits';
+const OLD_BRAND_KIT_KEY = 'linkedin_banner_brand_kit';
 
-export const saveBrandKit = (brandKit) => {
+export const saveKits = (kits) => {
     try {
-        localStorage.setItem(BRAND_KIT_KEY, JSON.stringify(brandKit));
+        localStorage.setItem(KITS_KEY, JSON.stringify(kits));
     } catch (error) {
-        console.error("Failed to save brand kit:", error);
+        console.error("Failed to save kits:", error);
     }
 };
 
-export const getBrandKit = () => {
+export const getKits = () => {
     try {
-        const data = localStorage.getItem(BRAND_KIT_KEY);
-        return data ? JSON.parse(data) : null;
+        // Migration Check
+        const oldData = localStorage.getItem(OLD_BRAND_KIT_KEY);
+        let kits = [];
+
+        const storedKits = localStorage.getItem(KITS_KEY);
+        if (storedKits) {
+            kits = JSON.parse(storedKits);
+        }
+
+        if (oldData && !localStorage.getItem('migration_done')) {
+            try {
+                const oldKit = JSON.parse(oldData);
+                // Convert old kit to new format
+                if (oldKit.brandName || oldKit.logo || oldKit.colors) {
+                    const migratedKit = {
+                        id: Date.now(),
+                        type: 'brand',
+                        name: oldKit.brandName || 'Migrated Brand',
+                        colors: oldKit.colors || ['#000000', '#ffffff', '#808080'],
+                        font: oldKit.font || 'Inter',
+                        logo: oldKit.logo
+                    };
+                    kits.push(migratedKit);
+                }
+                localStorage.setItem(KITS_KEY, JSON.stringify(kits));
+                localStorage.setItem('migration_done', 'true');
+                // Optional: localStorage.removeItem(OLD_BRAND_KIT_KEY); 
+            } catch (e) {
+                console.error("Migration failed", e);
+            }
+        }
+
+        return kits;
     } catch (error) {
-        console.error("Failed to load brand kit:", error);
-        return null;
+        console.error("Failed to load kits:", error);
+        return [];
     }
 };
 
-export const clearBrandKit = () => {
-    localStorage.removeItem(BRAND_KIT_KEY);
-};

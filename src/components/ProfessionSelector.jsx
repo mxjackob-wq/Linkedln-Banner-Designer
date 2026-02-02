@@ -72,6 +72,27 @@ const ProfessionSelector = ({ onSelect }) => {
 
             {/* Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {/* Blank Design Option */}
+                <button
+                    onClick={() => onSelect({
+                        id: 'blank',
+                        label: 'Blank Design',
+                        keywords: [],
+                        category: 'General',
+                        colorPalette: ['#000000', '#000000', '#ffffff'], // White background
+                        defaultTagline: '',
+                        icon: 'file-plus'
+                    })}
+                    className="group flex flex-col items-center p-6 bg-white rounded-xl border-2 border-dashed border-blue-300 hover:border-blue-600 hover:bg-blue-50 transition-all duration-200 text-left cursor-pointer"
+                >
+                    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+                        <Plus size={24} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-1">Start from Scratch</h3>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Blank Canvas</span>
+                    <p className="text-sm text-slate-400 text-center">Design entirely from a blank slate</p>
+                </button>
+
                 {filteredProfessions.map(profession => {
                     const Icon = iconMap[profession.icon] || Briefcase;
                     return (

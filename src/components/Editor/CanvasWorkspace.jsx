@@ -12,7 +12,7 @@ const CanvasWorkspace = (props) => {
                 }}>
             </div>
 
-            <div className="relative shadow-2xl transition-transform duration-200 ease-out flex flex-col gap-4"
+            <div className="relative transition-transform duration-200 ease-out flex flex-col gap-4"
                 style={{ transform: `scale(${props.zoom / 100})` }}>
                 <BannerCanvas {...props} />
                 <button className="self-center flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">
